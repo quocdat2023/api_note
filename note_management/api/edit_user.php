@@ -44,10 +44,6 @@ if (isset($data['display_name'])) {
     $updateFields[] = "display_name = ?";
     $params[] = $data['display_name'];
 }
-if (isset($data['password'])) {
-    $updateFields[] = "password = ?";
-    $params[] = password_hash($data['password'], PASSWORD_DEFAULT); // Mã hóa mật khẩu
-}
 if (isset($data['is_active'])) {
     $updateFields[] = "is_active = ?";
     $params[] = $data['is_active'];

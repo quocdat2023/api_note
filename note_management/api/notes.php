@@ -158,53 +158,50 @@ try {
     }
         
         // **Thay đổi mật khẩu ghi chú (PUT)**
-    if ($_SERVER['REQUEST_METHOD'] === 'PUT' && isset($_GET['action']) && $_GET['action'] === 'change_password') {
-        $data = json_decode(file_get_contents("php://input"), true);
-        $note_id = $data['note_id'] ?? '';
-        $current_password = $data['current_password'] ?? '';
-        $new_password = $data['new_password'] ?? '';
-
-        if (!empty($note_id) && !empty($new_password)) {
-            // Kiểm tra mật khẩu hiện tại
-            $stmt = $pdo->prepare("SELECT password FROM notes WHERE id = ? AND user_id = ?");
-            $stmt->execute([$note_id, $_SESSION['user_id']]);
-            $note = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            $historyStmt = $pdo->prepare("
-            INSERT INTO note_history (note_id, user_id, action)
-            VALUES (?, ?, ?)
-            ");
-            $action_message = 'Đã thay đổi mật khẩu ghi chú cá nhân ' . $note_id;
-
-            // Ghi vào bảng lịch sử
-            $historyStmt->execute([$note_id, $_SESSION['user_id'], $action_message]);
-
-            if ($note) {
-                if ($note['password'] === $current_password ||  $current_password === "") {
-                    // Cập nhật mật khẩu mới
-                    $stmt = $pdo->prepare("UPDATE notes SET password = ? WHERE id = ? AND user_id = ?");
-                    $stmt->execute([$new_password, $note_id, $_SESSION['user_id']]);
-                                // Ghi vào bảng lịch sử
-                    $historyStmt = $pdo->prepare("
-                        INSERT INTO note_history (note_id, user_id, action)
-                        VALUES (?, ?, ?)
-                    ");
-                    $historyStmt->execute([$note_id, $_SESSION['user_id'], 'Đã thay đổi mật khẩu ghi chú '.$note_id]);
-
-                    echo json_encode(['message' => 'Mật khẩu đã được thay đổi.']);
+        if ($_SERVER['REQUEST_METHOD'] === 'PUT' && isset($_GET['action']) && $_GET['action'] === 'change_password') {
+            $data = json_decode(file_get_contents("php://input"), true);
+            $note_id = $data['note_id'] ?? '';
+            $current_password = $data['current_password'] ?? '';
+            $new_password = $data['new_password'] ?? '';
+            $confirm_password = $data['confirm_password'] ?? '';
+        
+            if (!empty($note_id) && !empty($new_password) && !empty($confirm_password)) {
+                if ($new_password !== $confirm_password) {
+                    echo json_encode(['message' => 'Mật khẩu mới và xác nhận mật khẩu không khớp.']);
+                    exit;
+                }
+        
+                // Kiểm tra mật khẩu hiện tại
+                $stmt = $pdo->prepare("SELECT password FROM notes WHERE id = ? AND user_id = ?");
+                $stmt->execute([$note_id, $_SESSION['user_id']]);
+                $note = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+                if ($note) {
+                    if ($note['password'] === $current_password || $current_password === "") {
+                        // Cập nhật mật khẩu mới
+                        $stmt = $pdo->prepare("UPDATE notes SET password = ? WHERE id = ? AND user_id = ?");
+                        $stmt->execute([$new_password, $note_id, $_SESSION['user_id']]);
+        
+                        // Ghi vào bảng lịch sử
+                        $historyStmt = $pdo->prepare("
+                            INSERT INTO note_history (note_id, user_id, action)
+                            VALUES (?, ?, ?)
+                        ");
+                        $historyStmt->execute([$note_id, $_SESSION['user_id'], 'Đã thay đổi mật khẩu ghi chú '.$note_id]);
+        
+                        echo json_encode(['message' => 'Mật khẩu đã được thay đổi.']);
+                    } else {
+                        echo json_encode(['message' => 'Mật khẩu hiện tại không đúng.']);
+                    }
                 } else {
-                    
-                    echo json_encode(['message' => 'Mật khẩu hiện tại không đúng.']);
+                    echo json_encode(['message' => 'Ghi chú không tìm thấy.']);
                 }
             } else {
-                echo json_encode(['message' => 'Ghi chú không tìm thấy.']);
+                echo json_encode(['message' => 'Thông tin không đầy đủ.']);
             }
-        } else {
-            echo json_encode(['message' => 'Thông tin không đầy đủ.']);
+            exit;
         }
-        exit;
-    }
-
+        
       // **Tắt bảo vệ bằng mật khẩu (DELETE)**
       if ($_SERVER['REQUEST_METHOD'] === 'PUT' && isset($_GET['action']) && $_GET['action'] === 'disable_password') {
         $data = json_decode(file_get_contents("php://input"), true);
@@ -212,7 +209,32 @@ try {
         $user_id = $_SESSION['user_id'];
 
         if (!empty($note_id)) {
-            $stmt = $pdo->prepare("UPDATE notes SET password = NULL WHERE id = ? AND user_id = ?");
+            $stmt = $pdo->prepare("UPDATE notes SET status_pass = 1 WHERE id = ? AND user_id = ?");
+            // $stmt->execute([$note_id, $_SESSION['user_id']]);
+            $stmt->execute([$note_id,  $user_id ]);
+            
+            $historyStmt = $pdo->prepare("
+            INSERT INTO note_history (note_id, user_id, action)
+            VALUES (?, ?, ?)
+            ");
+            // $historyStmt->execute([$note_id, $_SESSION['user_id'], 'Bảo vệ bằng mật khẩu đã được tắt.']);
+            $historyStmt->execute([$note_id,  $user_id , 'Bảo vệ bằng mật khẩu đã được tắt.']);
+
+            echo json_encode(['message' => 'Bảo vệ bằng mật khẩu đã được tắt.']);
+        } else {
+            echo json_encode(['message' => 'Thông tin không đầy đủ.']);
+        }
+        exit;
+    }
+
+    // **Bật bảo vệ bằng mật khẩu (DELETE)**
+    if ($_SERVER['REQUEST_METHOD'] === 'PUT' && isset($_GET['action']) && $_GET['action'] === 'enable_password') {
+        $data = json_decode(file_get_contents("php://input"), true);
+        $note_id = $data['note_id'] ?? '';
+        $user_id = $_SESSION['user_id'];
+
+        if (!empty($note_id)) {
+            $stmt = $pdo->prepare("UPDATE notes SET status_pass = 0 WHERE id = ? AND user_id = ?");
             // $stmt->execute([$note_id, $_SESSION['user_id']]);
             $stmt->execute([$note_id,  $user_id ]);
             
